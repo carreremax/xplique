@@ -99,6 +99,43 @@ class HsicEstimator(ABC):
         raise NotImplementedError()
 
     @tf.function
+    def estimator(self, masks, L, nb_dim, nb_design):
+        """
+        tf operations related to the estimator for performances
+
+        Parameters
+        ----------
+        masks
+            binary masks, each dimension corresponding to an image patch
+        L
+            output samples kernel Gram matrix
+        nb_dim
+            number of input variables to consider
+        nb_design
+            number of points used to estimate HSIC
+
+        Returns
+        -------
+        HSIC estimates
+            Raw HSIC estimates in tensorflow
+        """
+        X = tf.transpose(masks)
+
+        X1 = tf.reshape(X, (nb_dim, 1, nb_design, 1))
+        X2 = tf.transpose(X1, [0, 1, 3, 2])
+        K = self.input_kernel_func(X1, X2)
+        K = tf.math.reduce_prod(1 + K, axis=1)
+
+        H = tf.eye(nb_design) - tf.ones((nb_design, nb_design)) / nb_design
+        HK = tf.einsum("jk,ikl->ijl", H, K)
+        HL = tf.einsum("jk,kl->jl", H, L)
+
+        Kc = tf.einsum("ijk,kl->ijl", HK, H)
+        Lc = tf.einsum("jk,kl->jl", HL, H)
+
+        score = tf.math.reduce_sum(Kc * tf.transpose(Lc), axis=[1, 2]) / nb_design
+        return score
+
     def __call__(self, masks, outputs, nb_design):
         """
         Compute the test statistic using a self.output_kernel_func kernel for the output
@@ -125,21 +162,7 @@ class HsicEstimator(ABC):
         Y = tf.reshape(Y, (nb_design, 1))
         L = self.output_kernel_func(Y, tf.transpose(Y))
 
-        X = tf.transpose(masks)
-
-        X1 = tf.reshape(X, (nb_dim, 1, nb_design, 1))
-        X2 = tf.transpose(X1, [0, 1, 3, 2])
-        K = self.input_kernel_func(X1, X2)
-        K = tf.math.reduce_prod(1 + K, axis=1)
-
-        H = tf.eye(nb_design) - tf.ones((nb_design, nb_design)) / nb_design
-        HK = tf.einsum("jk,ikl->ijl", H, K)
-        HL = tf.einsum("jk,kl->jl", H, L)
-
-        Kc = tf.einsum("ijk,kl->ijl", HK, H)
-        Lc = tf.einsum("jk,kl->jl", HL, H)
-
-        score = tf.math.reduce_sum(Kc * tf.transpose(Lc), axis=[1, 2]) / nb_design
+        score = self.estimator(masks, L, nb_dim, nb_design)
 
         return self.post_process(score, masks)
 
@@ -153,9 +176,7 @@ class BinaryEstimator(HsicEstimator):
         return Kernel.from_string("binary")(X, Y)
 
     def output_kernel_func(self, X, Y):
-        width_y = tf.math.top_k(
-            tf.reshape(X, -1), k=tf.reduce_prod(X.shape) // 2
-        ).values()[-1]
+        width_y = np.percentile(Y, 50.0).astype(np.float32)
         kernel_func = partial(Kernel.from_string(self.output_kernel), width=width_y)
         return kernel_func(X, Y)
 
@@ -171,9 +192,7 @@ class RbfEstimator(HsicEstimator):
         return kernel_func(X, Y)
 
     def output_kernel_func(self, X, Y):
-        width_y = tf.math.top_k(
-            tf.reshape(X, -1), k=tf.reduce_prod(X.shape) // 2
-        ).values()[-1]
+        width_y = np.percentile(Y, 50.0).astype(np.float32)
         kernel_func = partial(Kernel.from_string(self.output_kernel), width=width_y)
         return kernel_func(X, Y)
 
@@ -187,8 +206,6 @@ class SobolevEstimator(HsicEstimator):
         return Kernel.from_string("sobolev")(X, Y)
 
     def output_kernel_func(self, X, Y):
-        width_y = tf.math.top_k(
-            tf.reshape(X, -1), k=tf.reduce_prod(X.shape) // 2
-        ).values()[-1]
+        width_y = np.percentile(Y, 50.0).astype(np.float32)
         kernel_func = partial(Kernel.from_string(self.output_kernel), width=width_y)
         return kernel_func(X, Y)
