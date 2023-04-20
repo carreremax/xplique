@@ -98,21 +98,21 @@ class HsicEstimator(ABC):
         """
         raise NotImplementedError()
 
+    @tf.function
     def __call__(self, masks, outputs, nb_design):
         """
-        Compute the test statistic using a self.output_kernel for the output and a kernel to be
-        defined in child classes for the input.
+        Compute the test statistic using a self.output_kernel_func kernel for the output
+        and self.input_kernel_func for the input, to be defined in child classes
+        for the input.
 
         Parameters
         ----------
         masks
             binary masks, each dimension corresponding to an image patch
-        L
-            Kernel matrix for the outputs
-        n
+        outputs
+            samples of the output variable
+        nb_design
             number of points used to estimate HSIC
-        nb_dim
-            number of patches
 
         Returns
         -------
