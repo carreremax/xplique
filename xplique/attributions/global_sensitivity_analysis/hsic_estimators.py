@@ -153,7 +153,9 @@ class BinaryEstimator(HsicEstimator):
         return Kernel.from_string("binary")(X, Y)
 
     def output_kernel_func(self, X, Y):
-        width_y = np.percentile(Y, 50.0).astype(np.float32)
+        width_y = tf.math.top_k(
+            tf.reshape(X, -1), k=tf.reduce_prod(X.shape) // 2
+        ).values()[-1]
         kernel_func = partial(Kernel.from_string(self.output_kernel), width=width_y)
         return kernel_func(X, Y)
 
@@ -169,7 +171,9 @@ class RbfEstimator(HsicEstimator):
         return kernel_func(X, Y)
 
     def output_kernel_func(self, X, Y):
-        width_y = np.percentile(Y, 50.0).astype(np.float32)
+        width_y = tf.math.top_k(
+            tf.reshape(X, -1), k=tf.reduce_prod(X.shape) // 2
+        ).values()[-1]
         kernel_func = partial(Kernel.from_string(self.output_kernel), width=width_y)
         return kernel_func(X, Y)
 
@@ -183,6 +187,8 @@ class SobolevEstimator(HsicEstimator):
         return Kernel.from_string("sobolev")(X, Y)
 
     def output_kernel_func(self, X, Y):
-        width_y = np.percentile(Y, 50.0).astype(np.float32)
+        width_y = tf.math.top_k(
+            tf.reshape(X, -1), k=tf.reduce_prod(X.shape) // 2
+        ).values()[-1]
         kernel_func = partial(Kernel.from_string(self.output_kernel), width=width_y)
         return kernel_func(X, Y)
