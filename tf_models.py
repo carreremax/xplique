@@ -71,37 +71,3 @@ def get_model_detection_function(model):
     return detections, prediction_dict, tf.reshape(shapes, [-1])
 
   return detect_fn
-
-detect_fn = get_model_detection_function(detection_model)
-
-imported = tf.saved_model.load("resnet-50-i224/")
-model_fn = imported.signatures['serving_default']
-
-input_image_size = (HEIGHT, WIDTH)
-plt.figure(figsize=(20, 20))
-min_score_thresh = 0.30 # Change minimum score for threshold to see all bounding boxes confidences.
-
-for i, serialized_example in enumerate(test_ds):
-  plt.subplot(1, 3, i+1)
-  decoded_tensors = tf_ex_decoder.decode(serialized_example)
-  image = build_inputs_for_object_detection(decoded_tensors['image'], input_image_size)
-  image = tf.expand_dims(image, axis=0)
-  image = tf.cast(image, dtype = tf.uint8)
-  image_np = image[0].numpy()
-  result = model_fn(image)
-  visualization_utils.visualize_boxes_and_labels_on_image_array(
-      image_np,
-      result['detection_boxes'][0].numpy(),
-      result['detection_classes'][0].numpy().astype(int),
-      result['detection_scores'][0].numpy(),
-      category_index=category_index,
-      use_normalized_coordinates=False,
-      max_boxes_to_draw=200,
-      min_score_thresh=min_score_thresh,
-      agnostic_mode=False,
-      instance_masks=None,
-      line_thickness=4)
-  plt.imshow(image_np)
-  plt.axis('off')
-
-plt.show()
